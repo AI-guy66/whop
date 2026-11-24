@@ -1,0 +1,491 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global Safety Net: Deny everything by default
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Primitive Helpers ---
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 260 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+    function incoming() {
+      return request.resource.data;
+    }
+    function existing() {
+      return resource.data;
+    }
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    function isVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+    function isAdmin() {
+      return isVerified() && (
+        request.auth.token.email == 'dennohtumoh69@gmail.com' ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    // --- Parent Whop Helpers (Master Gate) ---
+    function whopPath(whopId) {
+      return /databases/$(database)/documents/whops/$(whopId);
+    }
+    function whopExists(whopId) {
+      return exists(whopPath(whopId));
+    }
+    function getWhop(whopId) {
+      return get(whopPath(whopId)).data;
+    }
+    function isWhopOwner(whopId) {
+      return isVerified() && whopExists(whopId) && getWhop(whopId).ownerId == request.auth.uid;
+    }
+    function hasActiveMembership(whopId) {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/memberships/$(request.auth.uid + '_' + whopId)) &&
+        get(/databases/$(database)/documents/memberships/$(request.auth.uid + '_' + whopId)).data.status == 'active';
+    }
+
+    // --- Validation Blueprints ---
+    function isValidUserProfile(data) {
+      return data.keys().hasAll(['uid', 'displayName', 'handle', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['uid', 'displayName', 'handle', 'bio', 'createdAt', 'updatedAt'])
+        && data.uid is string && data.uid == request.auth.uid && isValidId(data.uid)
+        && data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 80
+        && data.handle is string && data.handle.size() >= 2 && data.handle.size() <= 40 && data.handle.matches('^[a-z0-9_\\-]+$')
+        && (!data.keys().hasAny(['bio']) || (data.bio is string && data.bio.size() <= 300))
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidUserPrivateInfo(data) {
+      return data.keys().hasAll(['uid', 'email', 'updatedAt'])
+        && data.keys().hasOnly(['uid', 'email', 'payoutAccount', 'updatedAt'])
+        && data.uid is string && data.uid == request.auth.uid && isValidId(data.uid)
+        && data.email is string && data.email.size() >= 3 && data.email.size() <= 200
+        && (!data.keys().hasAny(['payoutAccount']) || (data.payoutAccount is string && data.payoutAccount.size() <= 120))
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidCategory(cat) {
+      return cat in ['Trading & Finance', 'AI & Software', 'E-Commerce', 'Sports Picks', 'Design & Media', 'Fitness & Lifestyle'];
+    }
+
+    function isValidBillingInterval(interval) {
+      return interval in ['monthly', 'quarterly', 'one_time', 'free'];
+    }
+
+    function isValidAppsList(apps) {
+      return apps is list
+        && apps.size() >= 1 && apps.size() <= 6
+        && apps.hasOnly(['chat', 'courses', 'files', 'announcements']);
+    }
+
+    function isValidPerksList(perks) {
+      return perks is list
+        && perks.size() >= 1 && perks.size() <= 8
+        && perks[0] is string && perks[0].size() >= 1 && perks[0].size() <= 120;
+    }
+
+    function isValidWhop(data) {
+      return data.keys().hasAll([
+          'id', 'slug', 'title', 'tagline', 'description', 'category',
+          'ownerId', 'creatorName', 'creatorHandle', 'coverImage',
+          'priceCents', 'billingInterval', 'ratingAvg', 'reviewCount',
+          'memberCount', 'featured', 'published', 'apps', 'perks',
+          'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'id', 'slug', 'title', 'tagline', 'description', 'category',
+          'ownerId', 'creatorName', 'creatorHandle', 'coverImage',
+          'priceCents', 'billingInterval', 'ratingAvg', 'reviewCount',
+          'memberCount', 'featured', 'published', 'apps', 'perks',
+          'createdAt', 'updatedAt'
+        ])
+        && isValidId(data.id)
+        && data.slug is string && data.slug.size() >= 2 && data.slug.size() <= 80 && data.slug.matches('^[a-z0-9\\-]+$')
+        && data.title is string && data.title.size() >= 2 && data.title.size() <= 80
+        && data.tagline is string && data.tagline.size() >= 4 && data.tagline.size() <= 140
+        && data.description is string && data.description.size() >= 10 && data.description.size() <= 2500
+        && isValidCategory(data.category)
+        && isValidId(data.ownerId)
+        && data.creatorName is string && data.creatorName.size() >= 1 && data.creatorName.size() <= 80
+        && data.creatorHandle is string && data.creatorHandle.size() >= 2 && data.creatorHandle.size() <= 40
+        && data.coverImage is string && data.coverImage.size() >= 1 && data.coverImage.size() <= 500
+        && data.priceCents is number && data.priceCents >= 0 && data.priceCents <= 5000000
+        && isValidBillingInterval(data.billingInterval)
+        && data.ratingAvg is number && data.ratingAvg >= 0 && data.ratingAvg <= 5
+        && data.reviewCount is number && data.reviewCount >= 0 && data.reviewCount <= 1000000
+        && data.memberCount is number && data.memberCount >= 0 && data.memberCount <= 10000000
+        && data.featured is bool
+        && data.published is bool
+        && isValidAppsList(data.apps)
+        && isValidPerksList(data.perks)
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidLesson(data, whopId) {
+      return data.keys().hasAll(['id', 'whopId', 'moduleTitle', 'title', 'duration', 'summary', 'content', 'orderIndex', 'createdAt'])
+        && data.keys().hasOnly(['id', 'whopId', 'moduleTitle', 'title', 'duration', 'summary', 'content', 'orderIndex', 'createdAt'])
+        && isValidId(data.id)
+        && data.whopId == whopId
+        && data.moduleTitle is string && data.moduleTitle.size() >= 2 && data.moduleTitle.size() <= 80
+        && data.title is string && data.title.size() >= 2 && data.title.size() <= 120
+        && data.duration is string && data.duration.size() >= 2 && data.duration.size() <= 24
+        && data.summary is string && data.summary.size() >= 4 && data.summary.size() <= 400
+        && data.content is string && data.content.size() >= 10 && data.content.size() <= 4000
+        && data.orderIndex is number && data.orderIndex >= 0 && data.orderIndex <= 500
+        && data.createdAt is timestamp;
+    }
+
+    function isValidFile(data, whopId) {
+      return data.keys().hasAll(['id', 'whopId', 'title', 'fileType', 'fileSize', 'description', 'createdAt'])
+        && data.keys().hasOnly(['id', 'whopId', 'title', 'fileType', 'fileSize', 'description', 'licensePrefix', 'createdAt'])
+        && isValidId(data.id)
+        && data.whopId == whopId
+        && data.title is string && data.title.size() >= 2 && data.title.size() <= 100
+        && data.fileType is string && data.fileType.size() >= 2 && data.fileType.size() <= 24
+        && data.fileSize is string && data.fileSize.size() >= 2 && data.fileSize.size() <= 24
+        && data.description is string && data.description.size() >= 4 && data.description.size() <= 300
+        && (!data.keys().hasAny(['licensePrefix']) || (data.licensePrefix is string && data.licensePrefix.size() <= 16))
+        && data.createdAt is timestamp;
+    }
+
+    function isValidMessage(data, whopId) {
+      return data.keys().hasAll(['id', 'whopId', 'channel', 'authorId', 'authorName', 'authorHandle', 'text', 'createdAt'])
+        && data.keys().hasOnly(['id', 'whopId', 'channel', 'authorId', 'authorName', 'authorHandle', 'text', 'createdAt'])
+        && isValidId(data.id)
+        && data.whopId == whopId
+        && data.channel in ['general', 'announcements']
+        && data.authorId == request.auth.uid
+        && data.authorName is string && data.authorName.size() >= 1 && data.authorName.size() <= 80
+        && data.authorHandle is string && data.authorHandle.size() >= 2 && data.authorHandle.size() <= 40
+        && data.text is string && data.text.size() >= 1 && data.text.size() <= 1000
+        && data.createdAt is timestamp;
+    }
+
+    function isValidReview(data, whopId) {
+      return data.keys().hasAll(['id', 'whopId', 'authorId', 'authorName', 'rating', 'comment', 'createdAt'])
+        && data.keys().hasOnly(['id', 'whopId', 'authorId', 'authorName', 'rating', 'comment', 'createdAt'])
+        && isValidId(data.id)
+        && data.whopId == whopId
+        && data.authorId == request.auth.uid
+        && data.authorName is string && data.authorName.size() >= 1 && data.authorName.size() <= 80
+        && data.rating is number && data.rating >= 1 && data.rating <= 5
+        && data.comment is string && data.comment.size() >= 4 && data.comment.size() <= 800
+        && data.createdAt is timestamp;
+    }
+
+    function isValidCompletedLessons(listVal) {
+      return listVal is list
+        && listVal.size() <= 100
+        && (listVal.size() == 0 || (listVal[0] is string && listVal[0].size() <= 128));
+    }
+
+    function isValidMembership(data, membershipId) {
+      return data.keys().hasAll([
+          'id', 'whopId', 'whopTitle', 'whopSlug', 'whopCover',
+          'userId', 'userName', 'ownerId', 'planLabel', 'priceCents',
+          'billingInterval', 'status', 'licenseKey', 'completedLessons',
+          'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'id', 'whopId', 'whopTitle', 'whopSlug', 'whopCover',
+          'userId', 'userName', 'ownerId', 'planLabel', 'priceCents',
+          'billingInterval', 'status', 'licenseKey', 'completedLessons',
+          'createdAt', 'updatedAt'
+        ])
+        && data.id == membershipId
+        && membershipId == (data.userId + '_' + data.whopId)
+        && isValidId(data.whopId)
+        && data.whopTitle is string && data.whopTitle.size() >= 2 && data.whopTitle.size() <= 80
+        && data.whopSlug is string && data.whopSlug.size() >= 2 && data.whopSlug.size() <= 80
+        && data.whopCover is string && data.whopCover.size() >= 1 && data.whopCover.size() <= 500
+        && isValidId(data.userId)
+        && data.userName is string && data.userName.size() >= 1 && data.userName.size() <= 80
+        && isValidId(data.ownerId)
+        && data.planLabel is string && data.planLabel.size() >= 2 && data.planLabel.size() <= 60
+        && data.priceCents is number && data.priceCents >= 0 && data.priceCents <= 5000000
+        && isValidBillingInterval(data.billingInterval)
+        && data.status in ['active', 'cancelled']
+        && data.licenseKey is string && data.licenseKey.size() >= 8 && data.licenseKey.size() <= 40
+        && isValidCompletedLessons(data.completedLessons)
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidOrder(data) {
+      return data.keys().hasAll([
+          'id', 'whopId', 'whopTitle', 'buyerId', 'buyerName',
+          'ownerId', 'amountCents', 'feeCents', 'netCents',
+          'status', 'createdAt'
+        ])
+        && data.keys().hasOnly([
+          'id', 'whopId', 'whopTitle', 'buyerId', 'buyerName',
+          'ownerId', 'amountCents', 'feeCents', 'netCents',
+          'promoCode', 'status', 'createdAt'
+        ])
+        && isValidId(data.id)
+        && isValidId(data.whopId)
+        && data.whopTitle is string && data.whopTitle.size() >= 2 && data.whopTitle.size() <= 80
+        && data.buyerId == request.auth.uid
+        && data.buyerName is string && data.buyerName.size() >= 1 && data.buyerName.size() <= 80
+        && isValidId(data.ownerId)
+        && data.amountCents is number && data.amountCents >= 0 && data.amountCents <= 5000000
+        && data.feeCents is number && data.feeCents >= 0 && data.feeCents <= 5000000
+        && data.netCents is number && data.netCents >= 0 && data.netCents <= 5000000
+        && (!data.keys().hasAny(['promoCode']) || (data.promoCode is string && data.promoCode.size() <= 32))
+        && data.status in ['paid', 'refunded']
+        && data.createdAt is timestamp;
+    }
+
+    function isValidPayout(data) {
+      return data.keys().hasAll(['id', 'ownerId', 'amountCents', 'destination', 'status', 'createdAt'])
+        && data.keys().hasOnly(['id', 'ownerId', 'amountCents', 'destination', 'status', 'createdAt'])
+        && isValidId(data.id)
+        && data.ownerId == request.auth.uid
+        && data.amountCents is number && data.amountCents > 0 && data.amountCents <= 10000000
+        && data.destination is string && data.destination.size() >= 3 && data.destination.size() <= 80
+        && data.status == 'completed'
+        && data.createdAt is timestamp;
+    }
+
+    // --- Collection Rules ---
+
+    // 1. Users (Public profile + Isolated Private PII)
+    match /users/{userId} {
+      allow get: if isValidId(userId);
+      allow list: if false;
+      allow create: if isVerified() && isValidId(userId) && request.auth.uid == userId
+        && isValidUserProfile(incoming())
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isVerified() && isValidId(userId) && isValidUserProfile(incoming()) && (
+        isAdmin() ||
+        (request.auth.uid == userId
+          && incoming().uid == existing().uid
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'handle', 'bio', 'updatedAt']))
+      );
+      allow delete: if false;
+
+      match /private/{docId} {
+        allow get: if isValidId(userId) && isValidId(docId) && (isOwner(userId) || isAdmin());
+        allow list: if false;
+        allow create: if isVerified() && isValidId(userId) && docId == 'info' && request.auth.uid == userId
+          && isValidUserPrivateInfo(incoming())
+          && incoming().updatedAt == request.time;
+        allow update: if isVerified() && isValidId(userId) && docId == 'info'
+          && isValidUserPrivateInfo(incoming())
+          && request.auth.uid == userId
+          && incoming().uid == existing().uid
+          && incoming().updatedAt == request.time
+          && incoming().diff(existing()).affectedKeys().hasOnly(['email', 'payoutAccount', 'updatedAt']);
+        allow delete: if false;
+      }
+    }
+
+    // 2. Whops (Marketplace Storefronts)
+    match /whops/{whopId} {
+      allow get: if isValidId(whopId) && (existing().published == true || (isSignedIn() && existing().ownerId == request.auth.uid) || isAdmin());
+      allow list: if existing().published == true || (isSignedIn() && existing().ownerId == request.auth.uid);
+      allow create: if isVerified() && isValidId(whopId)
+        && isValidWhop(incoming())
+        && incoming().id == whopId
+        && incoming().ownerId == request.auth.uid
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isVerified() && isValidId(whopId) && isValidWhop(incoming()) && (
+        isAdmin() ||
+        // Action: Owner edits storefront details
+        (existing().ownerId == request.auth.uid
+          && incoming().id == existing().id
+          && incoming().ownerId == existing().ownerId
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && incoming().diff(existing()).affectedKeys().hasOnly([
+            'slug', 'title', 'tagline', 'description', 'category',
+            'coverImage', 'priceCents', 'billingInterval', 'published',
+            'apps', 'perks', 'updatedAt'
+          ])) ||
+        // Action: Member join increments memberCount by 1 atomically with membership
+        (incoming().id == existing().id
+          && incoming().ownerId == existing().ownerId
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && incoming().memberCount == existing().memberCount + 1
+          && incoming().diff(existing()).affectedKeys().hasOnly(['memberCount', 'updatedAt'])
+          && existsAfter(/databases/$(database)/documents/memberships/$(request.auth.uid + '_' + whopId)))
+      );
+      allow delete: if isVerified() && isValidId(whopId) && (existing().ownerId == request.auth.uid || isAdmin());
+
+      // 2a. Lessons (Course App)
+      match /lessons/{lessonId} {
+        allow get: if isValidId(whopId) && isValidId(lessonId)
+          && (isWhopOwner(whopId) || hasActiveMembership(whopId) || (whopExists(whopId) && getWhop(whopId).published == true && getWhop(whopId).priceCents == 0));
+        allow list: if isValidId(whopId)
+          && (isWhopOwner(whopId) || hasActiveMembership(whopId) || (whopExists(whopId) && getWhop(whopId).published == true && getWhop(whopId).priceCents == 0));
+        allow create: if isVerified() && isValidId(whopId) && isValidId(lessonId)
+          && isWhopOwner(whopId)
+          && isValidLesson(incoming(), whopId)
+          && incoming().id == lessonId
+          && incoming().createdAt == request.time;
+        allow update: if isVerified() && isValidId(whopId) && isValidId(lessonId)
+          && isWhopOwner(whopId)
+          && isValidLesson(incoming(), whopId)
+          && incoming().id == existing().id
+          && incoming().whopId == existing().whopId
+          && incoming().createdAt == existing().createdAt
+          && incoming().diff(existing()).affectedKeys().hasOnly(['moduleTitle', 'title', 'duration', 'summary', 'content', 'orderIndex']);
+        allow delete: if isVerified() && isValidId(whopId) && isValidId(lessonId) && isWhopOwner(whopId);
+      }
+
+      // 2b. Files & License Deliverables
+      match /files/{fileId} {
+        allow get: if isValidId(whopId) && isValidId(fileId)
+          && (isWhopOwner(whopId) || hasActiveMembership(whopId) || (whopExists(whopId) && getWhop(whopId).published == true && getWhop(whopId).priceCents == 0));
+        allow list: if isValidId(whopId)
+          && (isWhopOwner(whopId) || hasActiveMembership(whopId) || (whopExists(whopId) && getWhop(whopId).published == true && getWhop(whopId).priceCents == 0));
+        allow create: if isVerified() && isValidId(whopId) && isValidId(fileId)
+          && isWhopOwner(whopId)
+          && isValidFile(incoming(), whopId)
+          && incoming().id == fileId
+          && incoming().createdAt == request.time;
+        allow delete: if isVerified() && isValidId(whopId) && isValidId(fileId) && isWhopOwner(whopId);
+      }
+
+      // 2c. Community Chat & Announcements
+      match /messages/{messageId} {
+        allow get: if isValidId(whopId) && isValidId(messageId)
+          && (isWhopOwner(whopId) || hasActiveMembership(whopId) || (whopExists(whopId) && getWhop(whopId).published == true && getWhop(whopId).priceCents == 0));
+        allow list: if isValidId(whopId)
+          && (isWhopOwner(whopId) || hasActiveMembership(whopId) || (whopExists(whopId) && getWhop(whopId).published == true && getWhop(whopId).priceCents == 0));
+        allow create: if isVerified() && isValidId(whopId) && isValidId(messageId)
+          && whopExists(whopId)
+          && isValidMessage(incoming(), whopId)
+          && incoming().id == messageId
+          && incoming().createdAt == request.time
+          && (
+            (incoming().channel == 'announcements' && getWhop(whopId).ownerId == request.auth.uid) ||
+            (incoming().channel == 'general' && (
+              getWhop(whopId).ownerId == request.auth.uid ||
+              hasActiveMembership(whopId) ||
+              (getWhop(whopId).published == true && getWhop(whopId).priceCents == 0)
+            ))
+          );
+        allow delete: if isVerified() && isValidId(whopId) && isValidId(messageId)
+          && (existing().authorId == request.auth.uid || isWhopOwner(whopId));
+      }
+
+      // 2d. Reviews
+      match /reviews/{reviewId} {
+        allow get: if isValidId(whopId) && isValidId(reviewId);
+        allow list: if existing().whopId == whopId;
+        allow create: if isVerified() && isValidId(whopId) && isValidId(reviewId)
+          && reviewId == request.auth.uid
+          && whopExists(whopId)
+          && isValidReview(incoming(), whopId)
+          && incoming().id == reviewId
+          && incoming().createdAt == request.time;
+        allow delete: if isVerified() && isValidId(whopId) && isValidId(reviewId)
+          && (existing().authorId == request.auth.uid || isAdmin());
+      }
+    }
+
+    // 3. Memberships
+    match /memberships/{membershipId} {
+      allow get: if isSignedIn() && isValidId(membershipId)
+        && (existing().userId == request.auth.uid || existing().ownerId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn()
+        && (existing().userId == request.auth.uid || existing().ownerId == request.auth.uid);
+      allow create: if isVerified() && isValidId(membershipId)
+        && isValidMembership(incoming(), membershipId)
+        && incoming().userId == request.auth.uid
+        && whopExists(incoming().whopId)
+        && incoming().ownerId == getWhop(incoming().whopId).ownerId
+        && incoming().status == 'active'
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isVerified() && isValidId(membershipId)
+        && isValidMembership(incoming(), membershipId) && (
+          isAdmin() ||
+          // Action: Member toggles lesson completion or cancels/reactivates membership
+          (existing().userId == request.auth.uid
+            && incoming().id == existing().id
+            && incoming().whopId == existing().whopId
+            && incoming().userId == existing().userId
+            && incoming().ownerId == existing().ownerId
+            && incoming().createdAt == existing().createdAt
+            && incoming().updatedAt == request.time
+            && incoming().diff(existing()).affectedKeys().hasOnly(['completedLessons', 'status', 'updatedAt'])) ||
+          // Action: Whop owner revokes membership
+          (existing().ownerId == request.auth.uid
+            && incoming().id == existing().id
+            && incoming().whopId == existing().whopId
+            && incoming().userId == existing().userId
+            && incoming().ownerId == existing().ownerId
+            && incoming().createdAt == existing().createdAt
+            && incoming().updatedAt == request.time
+            && incoming().status == 'cancelled'
+            && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']))
+        );
+      allow delete: if false;
+    }
+
+    // 4. Orders
+    match /orders/{orderId} {
+      allow get: if isSignedIn() && isValidId(orderId)
+        && (existing().buyerId == request.auth.uid || existing().ownerId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn()
+        && (existing().buyerId == request.auth.uid || existing().ownerId == request.auth.uid);
+      allow create: if isVerified() && isValidId(orderId)
+        && isValidOrder(incoming())
+        && incoming().id == orderId
+        && whopExists(incoming().whopId)
+        && incoming().ownerId == getWhop(incoming().whopId).ownerId
+        && incoming().status == 'paid'
+        && incoming().createdAt == request.time;
+      allow update: if isVerified() && isValidId(orderId)
+        && isValidOrder(incoming())
+        && existing().status != 'refunded'
+        && (
+          isAdmin() ||
+          (existing().ownerId == request.auth.uid
+            && incoming().id == existing().id
+            && incoming().whopId == existing().whopId
+            && incoming().buyerId == existing().buyerId
+            && incoming().ownerId == existing().ownerId
+            && incoming().createdAt == existing().createdAt
+            && incoming().status == 'refunded'
+            && incoming().diff(existing()).affectedKeys().hasOnly(['status']))
+        );
+      allow delete: if false;
+    }
+
+    // 5. Payouts
+    match /payouts/{payoutId} {
+      allow get: if isSignedIn() && isValidId(payoutId) && (existing().ownerId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && existing().ownerId == request.auth.uid;
+      allow create: if isVerified() && isValidId(payoutId)
+        && isValidPayout(incoming())
+        && incoming().id == payoutId
+        && incoming().createdAt == request.time;
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    // 6. Admins
+    match /admins/{userId} {
+      allow get: if isSignedIn() && isValidId(userId) && (request.auth.uid == userId || isAdmin());
+      allow list: if false;
+      allow write: if false;
+    }
+  }
+}

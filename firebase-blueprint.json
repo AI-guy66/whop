@@ -1,0 +1,241 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Public-safe creator and member profile without PII.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "displayName": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "handle": { "type": "string", "minLength": 2, "maxLength": 40, "pattern": "^[a-z0-9_\\-]+$" },
+        "bio": { "type": "string", "maxLength": 300 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "displayName", "handle", "createdAt", "updatedAt"]
+    },
+    "UserPrivateInfo": {
+      "title": "UserPrivateInfo",
+      "description": "Strictly private user PII and payout settings.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "email": { "type": "string", "maxLength": 200 },
+        "payoutAccount": { "type": "string", "maxLength": 120 },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "updatedAt"]
+    },
+    "Whop": {
+      "title": "Whop",
+      "description": "A digital storefront, community, SaaS, or course listing on Whop.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 2, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "slug": { "type": "string", "minLength": 2, "maxLength": 80, "pattern": "^[a-z0-9\\-]+$" },
+        "title": { "type": "string", "minLength": 2, "maxLength": 80 },
+        "tagline": { "type": "string", "minLength": 4, "maxLength": 140 },
+        "description": { "type": "string", "minLength": 10, "maxLength": 2500 },
+        "category": {
+          "type": "string",
+          "enum": ["Trading & Finance", "AI & Software", "E-Commerce", "Sports Picks", "Design & Media", "Fitness & Lifestyle"]
+        },
+        "ownerId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "creatorName": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "creatorHandle": { "type": "string", "minLength": 2, "maxLength": 40 },
+        "coverImage": { "type": "string", "minLength": 1, "maxLength": 500 },
+        "priceCents": { "type": "number" },
+        "billingInterval": { "type": "string", "enum": ["monthly", "quarterly", "one_time", "free"] },
+        "ratingAvg": { "type": "number" },
+        "reviewCount": { "type": "number" },
+        "memberCount": { "type": "number" },
+        "featured": { "type": "boolean" },
+        "published": { "type": "boolean" },
+        "apps": { "type": "array" },
+        "perks": { "type": "array" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "id", "slug", "title", "tagline", "description", "category",
+        "ownerId", "creatorName", "creatorHandle", "coverImage",
+        "priceCents", "billingInterval", "ratingAvg", "reviewCount",
+        "memberCount", "featured", "published", "apps", "perks",
+        "createdAt", "updatedAt"
+      ]
+    },
+    "WhopLesson": {
+      "title": "WhopLesson",
+      "description": "Structured course lesson inside a Whop storefront.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 2, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "whopId": { "type": "string", "minLength": 2, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "moduleTitle": { "type": "string", "minLength": 2, "maxLength": 80 },
+        "title": { "type": "string", "minLength": 2, "maxLength": 120 },
+        "duration": { "type": "string", "minLength": 2, "maxLength": 24 },
+        "summary": { "type": "string", "minLength": 4, "maxLength": 400 },
+        "content": { "type": "string", "minLength": 10, "maxLength": 4000 },
+        "orderIndex": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "whopId", "moduleTitle", "title", "duration", "summary", "content", "orderIndex", "createdAt"]
+    },
+    "WhopFile": {
+      "title": "WhopFile",
+      "description": "Downloadable digital asset or software license configuration.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 2, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "whopId": { "type": "string", "minLength": 2, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "title": { "type": "string", "minLength": 2, "maxLength": 100 },
+        "fileType": { "type": "string", "minLength": 2, "maxLength": 24 },
+        "fileSize": { "type": "string", "minLength": 2, "maxLength": 24 },
+        "description": { "type": "string", "minLength": 4, "maxLength": 300 },
+        "licensePrefix": { "type": "string", "maxLength": 16 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "whopId", "title", "fileType", "fileSize", "description", "createdAt"]
+    },
+    "WhopMessage": {
+      "title": "WhopMessage",
+      "description": "Community chat or announcement message inside a Whop.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 2, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "whopId": { "type": "string", "minLength": 2, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "channel": { "type": "string", "enum": ["general", "announcements"] },
+        "authorId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "authorName": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "authorHandle": { "type": "string", "minLength": 2, "maxLength": 40 },
+        "text": { "type": "string", "minLength": 1, "maxLength": 1000 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "whopId", "channel", "authorId", "authorName", "authorHandle", "text", "createdAt"]
+    },
+    "WhopReview": {
+      "title": "WhopReview",
+      "description": "Member review and rating for a Whop.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 2, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "whopId": { "type": "string", "minLength": 2, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "authorId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "authorName": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "rating": { "type": "number" },
+        "comment": { "type": "string", "minLength": 4, "maxLength": 800 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "whopId", "authorId", "authorName", "rating", "comment", "createdAt"]
+    },
+    "Membership": {
+      "title": "Membership",
+      "description": "Active or cancelled membership pass linking a buyer to a Whop.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 3, "maxLength": 260, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "whopId": { "type": "string", "minLength": 2, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "whopTitle": { "type": "string", "minLength": 2, "maxLength": 80 },
+        "whopSlug": { "type": "string", "minLength": 2, "maxLength": 80 },
+        "whopCover": { "type": "string", "minLength": 1, "maxLength": 500 },
+        "userId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "userName": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "ownerId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "planLabel": { "type": "string", "minLength": 2, "maxLength": 60 },
+        "priceCents": { "type": "number" },
+        "billingInterval": { "type": "string", "enum": ["monthly", "quarterly", "one_time", "free"] },
+        "status": { "type": "string", "enum": ["active", "cancelled"] },
+        "licenseKey": { "type": "string", "minLength": 8, "maxLength": 40 },
+        "completedLessons": { "type": "array" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "id", "whopId", "whopTitle", "whopSlug", "whopCover",
+        "userId", "userName", "ownerId", "planLabel", "priceCents",
+        "billingInterval", "status", "licenseKey", "completedLessons",
+        "createdAt", "updatedAt"
+      ]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "Immutable payment transaction record for a Whop checkout.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 2, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "whopId": { "type": "string", "minLength": 2, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "whopTitle": { "type": "string", "minLength": 2, "maxLength": 80 },
+        "buyerId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "buyerName": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "ownerId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "amountCents": { "type": "number" },
+        "feeCents": { "type": "number" },
+        "netCents": { "type": "number" },
+        "promoCode": { "type": "string", "maxLength": 32 },
+        "status": { "type": "string", "enum": ["paid", "refunded"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "id", "whopId", "whopTitle", "buyerId", "buyerName",
+        "ownerId", "amountCents", "feeCents", "netCents",
+        "status", "createdAt"
+      ]
+    },
+    "Payout": {
+      "title": "Payout",
+      "description": "Creator payout settlement record.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 2, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "ownerId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "amountCents": { "type": "number" },
+        "destination": { "type": "string", "minLength": 3, "maxLength": 80 },
+        "status": { "type": "string", "enum": ["completed"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "ownerId", "amountCents", "destination", "status", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Public creator and member profile documents."
+    },
+    "/users/{userId}/private/{docId}": {
+      "schema": { "$ref": "#/entities/UserPrivateInfo" },
+      "description": "Private user PII isolated from public reads."
+    },
+    "/whops/{whopId}": {
+      "schema": { "$ref": "#/entities/Whop" },
+      "description": "Marketplace Whop storefronts."
+    },
+    "/whops/{whopId}/lessons/{lessonId}": {
+      "schema": { "$ref": "#/entities/WhopLesson" },
+      "description": "Course lessons belonging to a Whop."
+    },
+    "/whops/{whopId}/files/{fileId}": {
+      "schema": { "$ref": "#/entities/WhopFile" },
+      "description": "Digital deliverables and license metadata belonging to a Whop."
+    },
+    "/whops/{whopId}/messages/{messageId}": {
+      "schema": { "$ref": "#/entities/WhopMessage" },
+      "description": "Community chat and announcement messages inside a Whop."
+    },
+    "/whops/{whopId}/reviews/{reviewId}": {
+      "schema": { "$ref": "#/entities/WhopReview" },
+      "description": "Verified member reviews for a Whop."
+    },
+    "/memberships/{membershipId}": {
+      "schema": { "$ref": "#/entities/Membership" },
+      "description": "Membership passes keyed by {userId}_{whopId}."
+    },
+    "/orders/{orderId}": {
+      "schema": { "$ref": "#/entities/Order" },
+      "description": "Checkout transactions for Whop memberships."
+    },
+    "/payouts/{payoutId}": {
+      "schema": { "$ref": "#/entities/Payout" },
+      "description": "Creator payout settlement records."
+    }
+  }
+}

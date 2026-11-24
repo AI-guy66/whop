@@ -1,0 +1,6 @@
+{
+  "name": "Whop",
+  "description": "Discover, buy, and sell digital products, communities, software, and courses on Whop.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
